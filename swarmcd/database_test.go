@@ -59,7 +59,7 @@ func TestDatabaseParallelAccess(t *testing.T) {
 	defer closeSqlDb()
 
 	const workers = 10
-	const insertsPerWorker = 10
+	const insertsPerWorker = 100
 	var wg sync.WaitGroup
 	now := time.Now()
 
@@ -79,7 +79,7 @@ func TestDatabaseParallelAccess(t *testing.T) {
 
 				err := saveLastDeployedMetadata(stackName, stackMetadata)
 				if err != nil {
-					t.Errorf("Worker %d: failed to insert: %v", workerID, err)
+					t.Errorf("Worker (%d, %d): failed to insert: %v", workerID, j, err)
 				}
 			}
 		}(i)
@@ -107,9 +107,6 @@ func setupTestDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
-
-	t.Log("Test DB setup complete.")
-
 }
 
 func isRoughlyEqual(t1, t2 time.Time, tolerance time.Duration) bool {

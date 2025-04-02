@@ -5,11 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	_ "modernc.org/sqlite"
+	"sync"
 	"time"
 )
 
 var globalDB *sql.DB
 var dbPath string
+
+var dbMutex sync.Mutex
 
 type stackMetadata struct {
 	repoRevision          string
@@ -108,7 +111,8 @@ func saveLastDeployedMetadata(stackName string, stackMetadata *stackMetadata) er
 	if globalDB == nil {
 		return fmt.Errorf("DB not initialized")
 	}
-
+	// Example of protecting access to globalDB
+	dbMutex.Lock()
 	_, err := globalDB.Exec(`
 		INSERT INTO revisions (stack, repo_revision, deployed_stack_revision, hash, deployed_at) 
 		VALUES (?, ?, ?, ?, ?) 
@@ -118,6 +122,7 @@ func saveLastDeployedMetadata(stackName string, stackMetadata *stackMetadata) er
 			hash = excluded.hash,
 			deployed_at = excluded.deployed_at
 	`, stackName, stackMetadata.repoRevision, stackMetadata.deployedStackRevision, stackMetadata.hash, stackMetadata.deployedAt)
+	dbMutex.Unlock()
 
 	if err != nil {
 		return fmt.Errorf("failed to save revision: %w", err)
