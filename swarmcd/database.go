@@ -85,6 +85,12 @@ func initSqlDB(dbFile string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
 	}
 
+	// Set a busy timeout to prevent SQLITE_BUSY errors
+	_, err = db.Exec(`PRAGMA busy_timeout = 5000;`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+	}
+
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS revisions (
 		stack TEXT PRIMARY KEY, 
 		repo_revision TEXT, 
