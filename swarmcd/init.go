@@ -112,7 +112,7 @@ func initStacks() error {
 	var newStackStatus = map[string]*StackStatus{}
 
 	for stack, stackConfig := range config.StackConfigs {
-		logger.Info(fmt.Sprintf("reading stackConfig for stack: %v", stack))
+		logger.Debug(fmt.Sprintf("reading stackConfig for stack: %v", stack))
 
 		stackRepo, ok := repos[stackConfig.Repo]
 		if !ok {
