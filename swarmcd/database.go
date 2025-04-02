@@ -5,12 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	_ "modernc.org/sqlite"
-	"os"
 	"time"
 )
 
 var globalDB *sql.DB
-var dbInitialized = false
+var dbPath string
 
 type stackMetadata struct {
 	repoRevision          string
@@ -41,16 +40,14 @@ func (stackMetadata *stackMetadata) fmtHash() string {
 	return fmtHash(stackMetadata.hash)
 }
 
-func getDBFilePath() string {
-	if path := os.Getenv("SWARMCD_DB"); path != "" {
-		return path
-	}
-	return "/data/revisions.db" // Default path
-}
-
 // Ensure database and table exist
 func initSqlDB(dbFile string) error {
-	sqlDB, err := sql.Open("sqlite", dbFile)
+	dbPath = dbFile
+	return initDB()
+}
+
+func initDB() error {
+	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
@@ -78,21 +75,29 @@ func initSqlDB(dbFile string) error {
 		return fmt.Errorf("failed to create table: %w", err)
 	}
 
-	dbInitialized = true
 	globalDB = sqlDB
 	return nil
 }
 
+func ensureDBAliveOrReconnect() error {
+	if err := globalDB.Ping(); err != nil {
+		logger.Info("Database connection lost, reconnecting...")
+		if err := initDB(); err != nil {
+			return fmt.Errorf("failed to reconnect to the database: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func closeSqlDb() error {
-	if dbInitialized {
+	if globalDB != nil {
 		err := globalDB.Close()
 		if err != nil {
 			return fmt.Errorf("failed to close database: %w", err)
-		} else {
-			dbInitialized = false
 		}
 	} else {
-		logger.Info("DB already closed")
+		logger.Info("DB was uninitialized closed")
 	}
 
 	return nil
@@ -100,7 +105,7 @@ func closeSqlDb() error {
 
 // Save last deployed stackMetadata
 func saveLastDeployedMetadata(stackName string, stackMetadata *stackMetadata) error {
-	if !dbInitialized {
+	if globalDB == nil {
 		return fmt.Errorf("DB not initialized")
 	}
 
@@ -123,7 +128,7 @@ func saveLastDeployedMetadata(stackName string, stackMetadata *stackMetadata) er
 
 // Load a stack's stackMetadata
 func loadLastDeployedMetadata(stackName string) (*stackMetadata, error) {
-	if !dbInitialized {
+	if globalDB == nil {
 		return nil, fmt.Errorf("DB not initialized")
 	}
 

@@ -3,6 +3,7 @@ package swarmcd
 import (
 	"fmt"
 	"github.com/m-adawi/swarm-cd/util"
+	"os"
 	"sync"
 	"time"
 )
@@ -22,6 +23,14 @@ func getWorkerCount() int {
 
 	return workerCount
 }
+
+func getDBFilePath() string {
+	if path := os.Getenv("SWARMCD_DB"); path != "" {
+		return path
+	}
+	return "/data/revisions.db" // Default path
+}
+
 func Run() {
 	logger.Info("starting SwarmCD")
 	err := initSqlDB(getDBFilePath())
@@ -34,6 +43,11 @@ func Run() {
 
 	for {
 		logger.Debug("starting update loop")
+		if err := ensureDBAliveOrReconnect(); err != nil {
+			logger.Error(fmt.Sprintf("%v", err))
+			return
+		}
+
 		var waitGroup sync.WaitGroup
 		stacksChannel := make(chan *swarmStack, len(stacks))
 
