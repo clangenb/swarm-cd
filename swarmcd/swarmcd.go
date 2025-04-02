@@ -10,22 +10,43 @@ import (
 var stackStatus = map[string]*StackStatus{}
 var stacks = map[string]*swarmStack{}
 
+const workerCount = 5 // Adjust this based on available CPU cores and workload
+
 func Run() {
 	logger.Info("starting SwarmCD")
 	for {
+		logger.Info("Checking if stack needs to be updated...")
 		var waitGroup sync.WaitGroup
-		logger.Info("updating stacks...")
-		for _, swarmStack := range stacks {
-			logger.Debug(fmt.Sprintf("Starting go routine for %v", swarmStack.name))
-			waitGroup.Add(1)
-			go updateStackThread(swarmStack, &waitGroup)
+		stacksChannel := make(chan *swarmStack, len(stacks))
+
+		// Start worker pool
+		for i := 0; i < workerCount; i++ {
+			go worker(stacksChannel, &waitGroup)
 		}
+
+		// Send stacks to workers
+		for _, swarmStack := range stacks {
+			logger.Debug(fmt.Sprintf("Queueing stack %v for update", swarmStack.name))
+			waitGroup.Add(1)
+			stacksChannel <- swarmStack
+		}
+		close(stacksChannel)
+
+		// Wait for all workers to complete
 		waitGroup.Wait()
+
 		logger.Info("waiting for the update interval")
 		time.Sleep(time.Duration(config.UpdateInterval) * time.Second)
 
-		logger.Info("check if new repos or new stacks are available")
+		logger.Info("checking if new repos or new stacks are in the config")
 		updateStackConfigs()
+	}
+}
+
+func worker(stacks <-chan *swarmStack, waitGroup *sync.WaitGroup) {
+	for swarmStack := range stacks {
+		updateStackThread(swarmStack)
+		waitGroup.Done()
 	}
 }
 
@@ -47,11 +68,10 @@ func updateStackConfigs() {
 	}
 }
 
-func updateStackThread(swarmStack *swarmStack, waitGroup *sync.WaitGroup) {
+func updateStackThread(swarmStack *swarmStack) {
 	repoLock := swarmStack.repo.lock
 	repoLock.Lock()
 	defer repoLock.Unlock()
-	defer waitGroup.Done()
 
 	logger.Info(fmt.Sprintf("%s updating stack", swarmStack.name))
 	stackMetadata, err := swarmStack.updateStack()
