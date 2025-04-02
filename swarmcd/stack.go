@@ -68,7 +68,7 @@ func (swarmStack *swarmStack) updateStack() (stackMetadata *stackMetadata, err e
 		logger.Info(fmt.Sprintf("%s no last revision found", swarmStack.name))
 	}
 
-	logger.Info(fmt.Sprintf("%s new revision revision found %s! will update the stack", swarmStack.name, revision))
+	logger.Info(fmt.Sprintf("%s new revision revision found %s! Checking if stack deployment needed...", swarmStack.name, revision))
 
 	log.Debug("reading stack file...")
 	stackBytes, err := swarmStack.readStack()
@@ -287,11 +287,11 @@ func (swarmStack *swarmStack) shouldDeploy(newMetadata *stackMetadata, deployedM
 	logger.Debug(fmt.Sprintf("%s Old Stack hash: %s", swarmStack.name, deployedMetadata.fmtHash()))
 	logger.Debug(fmt.Sprintf("%s New Stack hash: %s", swarmStack.name, newMetadata.fmtHash()))
 	if newMetadata.hash == deployedMetadata.hash {
-		logger.Info(fmt.Sprintf("%s stack file hash unchanged, hash=%s. Will skip deployment of revision: %s", swarmStack.name, deployedMetadata.fmtHash(), newMetadata.repoRevision))
+		logger.Info(fmt.Sprintf("%s stack file hash unchanged, hash=%s. Skipping deployment.", swarmStack.name, deployedMetadata.fmtHash()))
 		logger.Info(fmt.Sprintf("%s stack remains at revision: %s", swarmStack.name, deployedMetadata.deployedStackRevision))
 		return false
 	}
-	logger.Info(fmt.Sprintf("%s new stack file with hash=%s found. Will continue with deployment of revision: %s", swarmStack.name, newMetadata.fmtHash(), newMetadata.repoRevision))
+	logger.Info(fmt.Sprintf("%s new stack file with hash=%s found. Deploying revision: %s", swarmStack.name, newMetadata.fmtHash(), newMetadata.repoRevision))
 	return true
 }
 
