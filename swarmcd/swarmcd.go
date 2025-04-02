@@ -10,7 +10,7 @@ import (
 var stackStatus = map[string]*StackStatus{}
 var stacks = map[string]*swarmStack{}
 
-const workerCount = 5 // Adjust this based on available CPU cores and workload
+const workerCount = 3 // Adjust this based on available CPU cores and workload
 
 func Run() {
 	logger.Info("starting SwarmCD")
