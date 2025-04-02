@@ -79,6 +79,12 @@ func initSqlDB(dbFile string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
+	// Enable Write-Ahead Logging (WAL) mode allowing concurrent read access
+	_, err = db.Exec("PRAGMA journal_mode = WAL;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+	}
+
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS revisions (
 		stack TEXT PRIMARY KEY, 
 		repo_revision TEXT, 
