@@ -3,8 +3,6 @@ package swarmcd
 import (
 	"fmt"
 	"github.com/m-adawi/swarm-cd/util"
-	"os"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -15,21 +13,15 @@ var stacks = map[string]*swarmStack{}
 func getWorkerCount() int {
 	const defaultWorkers = 3
 
-	workerStr := os.Getenv("SWARMCD_CONCURRENCY")
-	if workerStr == "" {
-		return defaultWorkers
-	}
-
-	workerCount, err := strconv.Atoi(workerStr)
-	if err != nil || workerCount <= 0 {
-		logger.Warn(fmt.Sprintf("Invalid SWARMCD_CONCURRENCY value, using default: %v", defaultWorkers))
+	workerCount := config.Concurrency
+	if workerCount <= 0 {
+		logger.Warn(fmt.Sprintf("Invalid `config.Concurrency value`, using default: %v", defaultWorkers))
 
 		return defaultWorkers
 	}
 
 	return workerCount
 }
-
 func Run() {
 	logger.Info("starting SwarmCD")
 	for {
