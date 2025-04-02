@@ -15,7 +15,7 @@ const workerCount = 3 // Adjust this based on available CPU cores and workload
 func Run() {
 	logger.Info("starting SwarmCD")
 	for {
-		logger.Info("Checking if stack needs to be updated...")
+		logger.Debug("starting update loop")
 		var waitGroup sync.WaitGroup
 		stacksChannel := make(chan *swarmStack, len(stacks))
 
@@ -73,7 +73,7 @@ func updateStackThread(swarmStack *swarmStack) {
 	repoLock.Lock()
 	defer repoLock.Unlock()
 
-	logger.Info(fmt.Sprintf("%s updating stack", swarmStack.name))
+	logger.Info(fmt.Sprintf("%s checking if stack needs to be updated", swarmStack.name))
 	stackMetadata, err := swarmStack.updateStack()
 	if err != nil {
 		stackStatus[swarmStack.name].Error = err.Error()
@@ -85,7 +85,7 @@ func updateStackThread(swarmStack *swarmStack) {
 	stackStatus[swarmStack.name].Revision = stackMetadata.repoRevision
 	stackStatus[swarmStack.name].DeployedStackRevision = stackMetadata.deployedStackRevision
 	stackStatus[swarmStack.name].DeployedAt = stackMetadata.deployedAt.Format(time.RFC3339)
-	logger.Info(fmt.Sprintf("%s done updating stack", swarmStack.name))
+	logger.Debug(fmt.Sprintf("%s updateStackThreadDone", swarmStack.name))
 }
 
 func GetStackStatus() map[string]*StackStatus {
