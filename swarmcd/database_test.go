@@ -11,11 +11,12 @@ import (
 
 func TestSaveAndLoadLastDeployedRevision(t *testing.T) {
 	const dbFile = ":memory:" // Use in-memory database for tests
-	db, err := initStackDB(dbFile, "test-stack")
+	const stackName = "test-stack"
+	err := initSqlDB(dbFile)
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
-	defer db.close()
+	defer closeSqlDb()
 
 	repoRevision := "abcdefgh"
 	stackRevision := "12345678"
@@ -25,12 +26,12 @@ func TestSaveAndLoadLastDeployedRevision(t *testing.T) {
 	now := time.Now()
 	version.deployedAt = now
 
-	err = db.saveLastDeployedMetadata(version)
+	err = saveLastDeployedMetadata(stackName, version)
 	if err != nil {
 		t.Fatalf("Failed to save repoRevision: %v", err)
 	}
 
-	loadedVersion, err := db.loadLastDeployedMetadata()
+	loadedVersion, err := loadLastDeployedMetadata(stackName)
 	if err != nil {
 		t.Fatalf("Failed to load repoRevision: %v", err)
 	}

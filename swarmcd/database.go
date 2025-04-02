@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+var globalDB *sql.DB
+var dbInitialized = false
+
 type stackMetadata struct {
 	repoRevision          string
 	deployedStackRevision string
@@ -45,53 +48,26 @@ func getDBFilePath() string {
 	return "/data/revisions.db" // Default path
 }
 
-type stackDB struct {
-	db        *sql.DB
-	stackName string
-}
-
 // Ensure database and table exist
-func initStackDB(dbFile string, stackName string) (*stackDB, error) {
-	db, err := initSqlDB(dbFile)
+func initSqlDB(dbFile string) error {
+	sqlDB, err := sql.Open("sqlite", dbFile)
 	if err != nil {
-		return nil, err
-	}
-
-	return &stackDB{db: db, stackName: stackName}, nil
-}
-
-func (stackDb *stackDB) saveLastDeployedMetadata(stackMetadata *stackMetadata) error {
-	return saveLastDeployedMetadata(stackDb.db, stackDb.stackName, stackMetadata)
-}
-
-func (stackDb *stackDB) loadLastDeployedMetadata() (*stackMetadata, error) {
-	return loadLastDeployedMetadata(stackDb.db, stackDb.stackName)
-}
-
-func (stackDb *stackDB) close() error {
-	return stackDb.db.Close()
-}
-
-// Ensure database and table exist
-func initSqlDB(dbFile string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", dbFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 
 	// Enable Write-Ahead Logging (WAL) mode allowing concurrent read access
-	_, err = db.Exec("PRAGMA journal_mode = WAL;")
+	_, err = sqlDB.Exec("PRAGMA journal_mode = WAL;")
 	if err != nil {
-		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+		return fmt.Errorf("failed to enable WAL mode: %w", err)
 	}
 
 	// Set a busy timeout to prevent SQLITE_BUSY errors
-	_, err = db.Exec(`PRAGMA busy_timeout = 5000;`)
+	_, err = sqlDB.Exec(`PRAGMA busy_timeout = 5000;`)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set busy timeout: %w", err)
+		return fmt.Errorf("failed to set busy timeout: %w", err)
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS revisions (
+	_, err = sqlDB.Exec(`CREATE TABLE IF NOT EXISTS revisions (
 		stack TEXT PRIMARY KEY, 
 		repo_revision TEXT, 
 		deployed_stack_revision TEXT, 
@@ -99,15 +75,36 @@ func initSqlDB(dbFile string) (*sql.DB, error) {
 		deployed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create table: %w", err)
+		return fmt.Errorf("failed to create table: %w", err)
 	}
 
-	return db, nil
+	dbInitialized = true
+	globalDB = sqlDB
+	return nil
+}
+
+func closeSqlDb() error {
+	if dbInitialized {
+		err := globalDB.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close database: %w", err)
+		} else {
+			dbInitialized = false
+		}
+	} else {
+		logger.Info("DB already closed")
+	}
+
+	return nil
 }
 
 // Save last deployed stackMetadata
-func saveLastDeployedMetadata(db *sql.DB, stackName string, stackMetadata *stackMetadata) error {
-	_, err := db.Exec(`
+func saveLastDeployedMetadata(stackName string, stackMetadata *stackMetadata) error {
+	if !dbInitialized {
+		return fmt.Errorf("DB not initialized")
+	}
+
+	_, err := globalDB.Exec(`
 		INSERT INTO revisions (stack, repo_revision, deployed_stack_revision, hash, deployed_at) 
 		VALUES (?, ?, ?, ?, ?) 
 		ON CONFLICT(stack) DO UPDATE SET 
@@ -125,11 +122,15 @@ func saveLastDeployedMetadata(db *sql.DB, stackName string, stackMetadata *stack
 }
 
 // Load a stack's stackMetadata
-func loadLastDeployedMetadata(db *sql.DB, stackName string) (*stackMetadata, error) {
+func loadLastDeployedMetadata(stackName string) (*stackMetadata, error) {
+	if !dbInitialized {
+		return nil, fmt.Errorf("DB not initialized")
+	}
+
 	var repoRevision, deployedStackRevision, hash string
 	var deployedAt time.Time
 
-	err := db.QueryRow(`
+	err := globalDB.QueryRow(`
 		SELECT repo_revision, deployed_stack_revision, hash, deployed_at 
 		FROM revisions 
 		WHERE stack = ?`, stackName).Scan(&repoRevision, &deployedStackRevision, &hash, &deployedAt)

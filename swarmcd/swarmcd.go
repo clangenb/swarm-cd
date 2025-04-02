@@ -24,6 +24,14 @@ func getWorkerCount() int {
 }
 func Run() {
 	logger.Info("starting SwarmCD")
+	err := initSqlDB(getDBFilePath())
+
+	if err != nil {
+		logger.Error(fmt.Sprintf("Could not initialize SQL DB: %v", err))
+		return
+	}
+	defer closeSqlDb()
+
 	for {
 		logger.Debug("starting update loop")
 		var waitGroup sync.WaitGroup
@@ -66,18 +74,18 @@ func worker(stacks <-chan *swarmStack, waitGroup *sync.WaitGroup) {
 func updateStackConfigs() {
 	err := util.LoadConfigs()
 	if err != nil {
-		logger.Info("Error calling loadConfig again: %v", err)
+		logger.Warn(fmt.Sprintf("Error calling loadConfig again: %v", err))
 		return
 	}
 
 	err = initRepos()
 	if err != nil {
-		logger.Info("Error calling initRepos again: %v", err)
+		logger.Warn(fmt.Sprintf("Error calling initRepos again: %v", err))
 	}
 
 	err = initStacks()
 	if err != nil {
-		logger.Info("Error calling initStacks again: %v", err)
+		logger.Warn(fmt.Sprintf("Error calling initStacks again: %v", err))
 	}
 }
 
