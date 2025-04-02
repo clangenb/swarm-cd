@@ -36,7 +36,7 @@ func newSwarmStack(name string, repo *stackRepo, branch string, composePath stri
 	}
 }
 
-func (swarmStack *swarmStack) updateStack() (stackMetadata *stackMetadata, err error) {
+func (swarmStack *swarmStack) updateStack(currentStatus *StackStatus) (stackMetadata *stackMetadata, err error) {
 	log := logger.With(
 		slog.String("stack", swarmStack.name),
 		slog.String("branch", swarmStack.branch),
@@ -48,6 +48,13 @@ func (swarmStack *swarmStack) updateStack() (stackMetadata *stackMetadata, err e
 		return nil, err
 	}
 	log.Debug("changes pulled", "revision", revision)
+
+	logger.Info(fmt.Sprintf("%s StackStatus Revision: %s", swarmStack.name, currentStatus.Revision))
+
+	if currentStatus.Revision == revision {
+		logger.Info(fmt.Sprintf("%s [Memory] stack up-to-date on rev: %s", swarmStack.name, revision))
+		return nil, nil
+	}
 
 	stackDb, err := initStackDB(getDBFilePath(), swarmStack.name)
 	if err != nil {
@@ -61,7 +68,7 @@ func (swarmStack *swarmStack) updateStack() (stackMetadata *stackMetadata, err e
 	}
 
 	if deployedMetadata.repoRevision == revision {
-		logger.Info(fmt.Sprintf("%s revision unchanged: stack up-to-date on rev: %s", swarmStack.name, revision))
+		logger.Info(fmt.Sprintf("%s [DB] stack up-to-date on rev: %s", swarmStack.name, revision))
 		return deployedMetadata, nil
 	}
 	if deployedMetadata.repoRevision == "" {
