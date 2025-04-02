@@ -31,7 +31,7 @@ func Run() {
 
 		// Start worker pool
 		var workerCount = getWorkerCount()
-		logger.Info(fmt.Sprintf("worker count: %v", workerCount))
+		logger.Debug(fmt.Sprintf("worker count: %v", workerCount))
 
 		for i := 0; i < workerCount; i++ {
 			go worker(stacksChannel, &waitGroup)
