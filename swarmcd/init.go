@@ -127,16 +127,18 @@ func initStacks() error {
 			delete(stacks, stack)
 		}
 
-		newStackStatus[stack] = &StackStatus{}
-		newStackStatus[stack].RepoURL = stackRepo.url
-		if _, exists := stackStatus[stack]; exists {
+		if status, exists := stackStatus[stack]; exists {
+			newStackStatus[stack] = status
 			delete(stacks, stack)
+		} else {
+			newStackStatus[stack] = &StackStatus{}
 		}
+
+		newStackStatus[stack].RepoURL = stackRepo.url
 	}
 
 	if len(stacks) != 0 {
 		logger.Info(fmt.Sprintf("Some stacks were removed: %v", stacks))
-		// Todo: do we need to do something for this.
 	}
 
 	stacks = newStacks
