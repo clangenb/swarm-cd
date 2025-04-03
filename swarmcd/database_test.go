@@ -1,6 +1,8 @@
 package swarmcd
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -10,12 +12,9 @@ import (
 )
 
 func TestSaveAndLoadLastDeployedRevision(t *testing.T) {
-	const dbFile = ":memory:" // Use in-memory database for tests
-	db, err := initStackDB(dbFile, "test-stack")
-	if err != nil {
-		t.Fatalf("failed to open database: %v", err)
-	}
-	defer db.close()
+	const stackName = "test-stack"
+	setupTestDB(t)
+	defer closeSqlDb()
 
 	repoRevision := "abcdefgh"
 	stackRevision := "12345678"
@@ -25,12 +24,12 @@ func TestSaveAndLoadLastDeployedRevision(t *testing.T) {
 	now := time.Now()
 	version.deployedAt = now
 
-	err = db.saveLastDeployedMetadata(version)
+	err := saveLastDeployedMetadata(stackName, version)
 	if err != nil {
 		t.Fatalf("Failed to save repoRevision: %v", err)
 	}
 
-	loadedVersion, err := db.loadLastDeployedMetadata()
+	loadedVersion, err := loadLastDeployedMetadata(stackName)
 	if err != nil {
 		t.Fatalf("Failed to load repoRevision: %v", err)
 	}
@@ -51,6 +50,62 @@ func TestSaveAndLoadLastDeployedRevision(t *testing.T) {
 
 	if loadedVersion.hash != expectedHash {
 		t.Errorf("Expected hash %s, got %s", expectedHash, loadedVersion.hash)
+	}
+}
+
+// Test parallel database access
+func TestDatabaseParallelAccess(t *testing.T) {
+	setupTestDB(t)
+	defer closeSqlDb()
+
+	const workers = 10
+	const insertsPerWorker = 100
+	var wg sync.WaitGroup
+	now := time.Now()
+
+	// Parallel inserts
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for j := 0; j < insertsPerWorker; j++ {
+				stackName := fmt.Sprintf("stack-%d", workerID)
+				stackMetadata := newStackMetadata(
+					fmt.Sprintf("repoRev-%d-%d", workerID, j),
+					fmt.Sprintf("stackRev-%d-%d", workerID, j),
+					fmt.Sprintf("hash-%d-%d", workerID, j),
+					now,
+				)
+
+				err := saveLastDeployedMetadata(stackName, stackMetadata)
+				if err != nil {
+					t.Errorf("Worker (%d, %d): failed to insert: %v", workerID, j, err)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait() // Wait for all goroutines
+
+	// Verify correct number of unique stack entries
+	var count int
+	err := globalDB.QueryRow("SELECT COUNT(*) FROM revisions").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count rows: %v", err)
+	}
+
+	// Expected: At most `workers` unique entries due to `ON CONFLICT`
+	if count != workers {
+		t.Errorf("Expected %d unique stacks, got %d", workers, count)
+	}
+}
+
+func setupTestDB(t *testing.T) {
+	const dbFile = "file:/foobar?vfs=memdb" // Use in-memory database for tests
+
+	err := initSqlDB(dbFile)
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
 	}
 }
 
