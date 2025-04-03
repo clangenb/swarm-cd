@@ -99,6 +99,7 @@ func closeSqlDb() error {
 		if err != nil {
 			return fmt.Errorf("failed to close database: %w", err)
 		}
+		globalDB = nil
 	} else {
 		logger.Info("DB was uninitialized closed")
 	}
