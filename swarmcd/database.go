@@ -112,7 +112,8 @@ func saveLastDeployedMetadata(stackName string, stackMetadata *stackMetadata) er
 	if globalDB == nil {
 		return fmt.Errorf("DB not initialized")
 	}
-	// Example of protecting access to globalDB
+
+	// We need this to prevent occasional `SQL_DB_BUSY` errors
 	dbMutex.Lock()
 	_, err := globalDB.Exec(`
 		INSERT INTO revisions (stack, repo_revision, deployed_stack_revision, hash, deployed_at) 
