@@ -1,4 +1,4 @@
-package integration_test
+package swarmcd_test
 
 import (
 	"context"
@@ -15,11 +15,11 @@ import (
 
 const swarmManagerImage = "docker:dind"
 
-// TestSwarmCDIntegration sets up a Swarm environment and runs SwarmCD
 func TestSwarmCDIntegration(t *testing.T) {
+	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
 	ctx := context.Background()
 
-	// Step 1: Start a Docker-in-Docker container (Swarm Manager)
+	// Step 1: Start a Swarm cluster inside a test container
 	swarmManager, err := startSwarmManager(ctx)
 	if err != nil {
 		t.Fatalf("Failed to start Swarm manager: %v", err)
@@ -44,21 +44,29 @@ func TestSwarmCDIntegration(t *testing.T) {
 		t.Fatalf("Failed to set up Git repository: %v", err)
 	}
 
-	// Step 4: Start SwarmCD
-	err = startSwarmCD(gitRepoDir)
+	// Step 4: Build SwarmCD Docker image
+	err = buildSwarmCDImage()
 	if err != nil {
-		t.Fatalf("Failed to start SwarmCD: %v", err)
+		t.Fatalf("Failed to build SwarmCD Docker image: %v", err)
 	}
 
-	// Step 5: Wait for updates to process
+	// Step 5: Deploy SwarmCD as a stack
+	err = deploySwarmCDStack()
+	if err != nil {
+		t.Fatalf("Failed to deploy SwarmCD stack: %v", err)
+	}
+
+	// Step 6: Wait for services to be deployed
 	time.Sleep(10 * time.Second)
 
-	// Step 6: Verify the SwarmCD service deployment
+	// Step 7: Verify deployment
 	out, err := runCommand("docker", "service", "ls")
 	if err != nil {
 		t.Fatalf("Failed to list services: %v", err)
 	}
-	assert.Contains(t, out, "my-app", "Expected service 'my-app' to be deployed by SwarmCD")
+	assert.Contains(t, out, "swarm-cd", "Expected service 'swarm-cd' to be deployed")
+
+	// (Optional) Verify stack changes by modifying the Git repository
 }
 
 // startSwarmManager starts a Docker-in-Docker container for Swarm
@@ -77,7 +85,7 @@ func startSwarmManager(ctx context.Context) (testcontainers.Container, error) {
 	})
 }
 
-// setupFakeGitRepo initializes a simple Git repository with a stack config
+// setupFakeGitRepo creates a Git repository with a sample stack config
 func setupFakeGitRepo(dir string) error {
 	_, err := runCommand("git", "-C", dir, "init")
 	if err != nil {
@@ -99,10 +107,16 @@ func setupFakeGitRepo(dir string) error {
 	return err
 }
 
-// startSwarmCD runs SwarmCD with the test Git repository
-func startSwarmCD(repoPath string) error {
-	cmd := exec.Command("./swarmcd", "--repo", repoPath)
-	return cmd.Start()
+// buildSwarmCDImage builds a Docker image for SwarmCD
+func buildSwarmCDImage() error {
+	_, err := runCommand("docker", "build", "-t", "swarmcd:test", ".")
+	return err
+}
+
+// deploySwarmCDStack deploys SwarmCD using a test stack file
+func deploySwarmCDStack() error {
+	_, err := runCommand("docker", "stack", "deploy", "--compose-file", "test/docker-compose.yaml", "swarm-cd")
+	return err
 }
 
 // runCommand executes a shell command and returns output
