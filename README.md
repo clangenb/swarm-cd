@@ -91,6 +91,34 @@ volumes:
     driver: local
 ```
 
+## Different config location
+You can set the path where swarm-cd looks for the configs with the env var `CONFIGS_PATH`. It is in 
+general better practice to mound folders than files into docker to be sure that we can see changes 
+from the host system on the mounted files.
+```yaml
+# docker-compose.yaml
+version: '3.7'
+services:
+  swarm-cd:
+    image: ghcr.io/m-adawi/swarm-cd:latest
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./configs:/app/configs:ro
+      - swarmcd_data:/data
+    environment:
+      - SWARMCD_DB=/data/revisions.db
+      - CONFIGS_PATH=./configs
+  
+volumes:
+  swarmcd_data:
+    driver: local
+```
+
+
 ## Manage Encrypted Secrets Using SOPS
 
 You can use [sops](https://github.com/getsops/sops) to encrypt secrets in git repos and
