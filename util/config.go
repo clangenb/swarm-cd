@@ -38,17 +38,20 @@ type Config struct {
 var Configs Config
 
 func LoadConfigs() (err error) {
-	err = readConfig()
+	configsPath := getConfigsPath()
+	Logger.Info(fmt.Sprintf("[Configs] path: %s", configsPath))
+
+	err = readConfig(configsPath)
 	if err != nil {
 		return fmt.Errorf("could not read configuration file: %w", err)
 	}
 
-	err = readRepoConfigs()
+	err = readRepoConfigs(configsPath)
 	if err != nil {
 		return fmt.Errorf("could not read repos file: %w", err)
 	}
 
-	err = readStackConfigs()
+	err = readStackConfigs(configsPath)
 	if err != nil {
 		return fmt.Errorf("could not load stacks file: %w", err)
 	}
@@ -59,13 +62,14 @@ func getConfigsPath() string {
 	if path := os.Getenv("CONFIGS_PATH"); path != "" {
 		return path
 	}
+	Logger.Info("[Configs] using default path `.`")
 	return "." // Default path
 }
 
-func readConfig() (err error) {
+func readConfig(path string) (err error) {
 	configViper := viper.New()
 	configViper.SetConfigName("config")
-	configViper.AddConfigPath(getConfigsPath())
+	configViper.AddConfigPath(path)
 	configViper.SetDefault("update_interval", 120)
 	configViper.SetDefault("concurrency", 3)
 	configViper.SetDefault("repos_path", "repos")
@@ -79,10 +83,10 @@ func readConfig() (err error) {
 	return configViper.Unmarshal(&Configs)
 }
 
-func readRepoConfigs() (err error) {
+func readRepoConfigs(path string) (err error) {
 	reposViper := viper.New()
 	reposViper.SetConfigName("repos")
-	reposViper.AddConfigPath(getConfigsPath())
+	reposViper.AddConfigPath(path)
 	err = reposViper.ReadInConfig()
 	if err != nil {
 		return
@@ -94,10 +98,10 @@ func readRepoConfigs() (err error) {
 	return reposViper.Unmarshal(&Configs.RepoConfigs)
 }
 
-func readStackConfigs() (err error) {
+func readStackConfigs(path string) (err error) {
 	stacksViper := viper.New()
 	stacksViper.SetConfigName("stacks")
-	stacksViper.AddConfigPath(getConfigsPath())
+	stacksViper.AddConfigPath(path)
 	err = stacksViper.ReadInConfig()
 	if err != nil {
 		return
