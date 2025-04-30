@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -54,10 +55,17 @@ func LoadConfigs() (err error) {
 	return
 }
 
+func getConfigsPath() string {
+	if path := os.Getenv("CONFIGS_PATH"); path != "" {
+		return path
+	}
+	return "." // Default path
+}
+
 func readConfig() (err error) {
 	configViper := viper.New()
 	configViper.SetConfigName("config")
-	configViper.AddConfigPath(".")
+	configViper.AddConfigPath(getConfigsPath())
 	configViper.SetDefault("update_interval", 120)
 	configViper.SetDefault("concurrency", 3)
 	configViper.SetDefault("repos_path", "repos")
@@ -74,7 +82,7 @@ func readConfig() (err error) {
 func readRepoConfigs() (err error) {
 	reposViper := viper.New()
 	reposViper.SetConfigName("repos")
-	reposViper.AddConfigPath(".")
+	reposViper.AddConfigPath(getConfigsPath())
 	err = reposViper.ReadInConfig()
 	if err != nil {
 		return
@@ -89,7 +97,7 @@ func readRepoConfigs() (err error) {
 func readStackConfigs() (err error) {
 	stacksViper := viper.New()
 	stacksViper.SetConfigName("stacks")
-	stacksViper.AddConfigPath(".")
+	stacksViper.AddConfigPath(getConfigsPath())
 	err = stacksViper.ReadInConfig()
 	if err != nil {
 		return
